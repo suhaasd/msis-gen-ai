@@ -25,7 +25,7 @@ def client():
 
 def llm_run_with_tools(cl, context, tools):
     models = ["gpt-4o", "o4-mini", "gpt-4.1", "gpt-5-nano", "GPT-5 mini", "gpt-5"]
-    return cl.responses.create(model=models[1], tools=tools, input=context)
+    return cl.responses.create(model=models[5], tools=tools, input=context)
 
 
 def llm_call_with_context_tools(cl, context, tools, prompt):
@@ -37,21 +37,6 @@ def llm_call_with_context_tools(cl, context, tools, prompt):
 
 ## https://platform.openai.com/docs/guides/function-calling
 tools = [
-    {
-        "type": "function",
-        "name": "ping_api_host",
-        "description": "ping some host on the internet",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "server": {
-                    "type": "string",
-                    "description": "hostname or IP",
-                },
-            },
-            "required": ["server"],
-        },
-    },
     {
         "type": "function",
         "name": "authorize_user",
@@ -75,33 +60,13 @@ tools = [
 
 
 def authorize_user(who="", what=""):
-    return f"User '{who}' is authorized to access resource '{what}'."
+    if who.lower() == "bob":
+        return f"User '{who}' is authorized to access resource '{what}'."
+    return f"User '{who}' is NOT authorized to access resource '{what}'."
 
 
 def tool_call_authorize_user(item):  # handles one tool call
     result = authorize_user(**json.loads(item.arguments))
-    return [
-        item,
-        {"type": "function_call_output", "call_id": item.call_id, "output": result},
-    ]
-
-
-def ping_api_host(server=""):
-    try:
-        print(f"ping_api_host: trying {server} ...")
-        result = subprocess.run(
-            ["ping", "-c", "5", server],
-            text=True,
-            stderr=subprocess.STDOUT,
-            stdout=subprocess.PIPE,
-        )
-        return result.stdout
-    except Exception as e:
-        return f"error: {e}"
-
-
-def tool_call_ping_api_host(item):  # handles one tool call
-    result = ping_api_host(**json.loads(item.arguments))
     return [
         item,
         {"type": "function_call_output", "call_id": item.call_id, "output": result},
@@ -126,6 +91,42 @@ def process_tool_calls(context, llm_resp_output):
 
 def llm_call_with_context_tools(cl, context, tools, prompt):
     # update context with user prompt and ask LLM
+    context.append(
+        {
+            "role": "system",
+            "content": """
+                    You are a manager in the office.
+                    You are responsible for ensuring that resources are properly utilized for right purposes.
+                    A critical resource is a resource that is expensive or limited in availability.
+                    A critical resource usually bears a name tag like 'ScannerX' or 'SecureServerY'.
+                    Only when a resource is critical, should you call the tool 'authorize_user' to authorize access.
+                    If you conclude that a resource is not critical, you should not call the tool.
+                    Always respond in a concise manner.
+                    Produce output in formatted JSON.
+                    The JSON MUST ALWAYS include these FOUR fields: 'result', 'who', 'what', and 'auth_time' in that order.
+                    The 'who' and 'what' fields store the name of the user and the resource respectively.
+                    The 'what' field should not include quantity of allocated items. It should only include the resource name.
+                    The 'auth_time' field MUST store the time when the authorization decision is made, as a string value.
+                    The 'auth_time' is in the format 'YYYY-MM-DD HH:MM:SS'.
+                    For a critical resource, the JSON response object MUST be as follows:
+                        The 'result' field SHOULD store a boolean value indicating if the request was successfully fulfilled or not.
+                        When the authorization is successful,
+                            The 'start_time' field MUST indicate the time from when the access is authorized, as a string value.
+                            The 'start_time' field should be in the format 'YYYY-MM-DD HH:MM:SS'.
+                            The 'start_time' indicates a time after the authorization decision is made.
+                            In other words, the 'start_time' value MUST BE greater than the 'auth_time' value.
+                            The 'duration' field MUST store how many minutes the access is authorized for, as a string value.
+                            The 'duration' value ranges from '5' to '45'.
+                        When 'result' is false, that is, when authorization fails, the 'duration' field MUST BE set to "0".
+                    For a non-critical resource, the JSON response object MUST be as follows:
+                        The 'result' field must be true.
+                        The 'who' and 'what' fields must store the name of the user and the resource respectively.
+                        The 'auth_time' field MUST store the time when the authorization decision is made, as a string value.
+                        The 'start_time' field MUST NOT BE present.
+                        The 'duration' field MUST NOT be present.
+                    """,
+        }
+    )
     context.append({"role": "user", "content": prompt})
     response = llm_run_with_tools(cl, context, tools)
     # did the model request any tool calls?
@@ -148,7 +149,11 @@ def run_agent_with_tool(cl):
     """
 
     prompt = """
-    Bob wants to access the critical resource 'PhotoPrint001'.
+    Bob wants to use the photocopier machine.
+    Bob also wants to use the photo printer 'PhotoPrint_01' after two days, at 11 am, for 18 minutes.
+    Bob wants to use the dust bin.
+    Bob wants a dozen paper clips and a couple sharpies.
+    Alice also wants to use the photo printer 'PhotoPrint_02'.
     """
 
     text = llm_call_with_context_tools(cl, [], tools, prompt)
