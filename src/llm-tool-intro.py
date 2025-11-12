@@ -33,10 +33,6 @@ def llm_run(cl, context):
 def llm_call_with_context(cl, context, prompt):
     context.append({"role": "user", "content": prompt})
     response = llm_run(cl, context)
-    # print("-" * 80)
-    # for r in response:
-    #    print(f"    {r[0]:>45} | {r[1]}")
-    # print("-" * 80)
     context.append({"role": "assistant", "content": response.output_text})
     return response.output_text
 

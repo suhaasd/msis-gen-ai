@@ -60,7 +60,7 @@ tools = [
 
 
 def authorize_user(who="", what=""):
-    if who.lower() == "bob":
+    if who.lower() in ["bob", "charlie"]:
         return f"User '{who}' is authorized to access resource '{what}'."
     return f"User '{who}' is NOT authorized to access resource '{what}'."
 
@@ -90,7 +90,7 @@ def process_tool_calls(context, llm_resp_output):
 
 
 def llm_call_with_context_tools(cl, context, tools, prompt):
-    # update context with user prompt and ask LLM
+    # update context with system and user prompts, and ask the LLM.
     context.append(
         {
             "role": "system",
@@ -124,6 +124,7 @@ def llm_call_with_context_tools(cl, context, tools, prompt):
                         The 'auth_time' field MUST store the time when the authorization decision is made, as a string value.
                         The 'start_time' field MUST NOT BE present.
                         The 'duration' field MUST NOT be present.
+                    When a request is not fulfilled, provide a brief reason in the 'summary' field.
                     """,
         }
     )
@@ -136,27 +137,21 @@ def llm_call_with_context_tools(cl, context, tools, prompt):
     return response.output_text
 
 
-def run_agent_with_tool(cl):
-    prompt_api_health = """
-    Describe our connectivity to the API server web3pleb.org.
-    Use different servers.
-    Check if the servers are running and available.
-    Produce output in formatted JSON.
-    The JSON should include only two fields: 'result', 'reachable' and 'summary' in that order.
-    The 'result' field stores a boolean value representing the success or failure to reach the endpoint.
-    The reachable endpoints must be stored under 'reachable' key.
-    The 'summary' field stores a brief text description of the connectivity status.
-    """
+# This detects that Bob and Charlie cannot access the same resource at the same time.\
+# without being explicitly told about it.
 
-    prompt = """
+
+def run_agent_with_tool(cl):
+    resource_requests = """
     Bob wants to use the photocopier machine.
     Bob also wants to use the photo printer 'PhotoPrint_01' after two days, at 11 am, for 18 minutes.
     Bob wants to use the dust bin.
     Bob wants a dozen paper clips and a couple sharpies.
+    Charlie wants to use the photo printer 'PhotoPrint_01' after two days, at 11.10 am, for 5 minutes.
     Alice also wants to use the photo printer 'PhotoPrint_02'.
     """
 
-    text = llm_call_with_context_tools(cl, [], tools, prompt)
+    text = llm_call_with_context_tools(cl, [], tools, resource_requests)
     print(text)
 
 

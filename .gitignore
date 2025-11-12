@@ -3,3 +3,14 @@ bin
 lib
 .DS_Store
 pyvenv.cfg
+temp
+out
+__pycache__/
+*.pyc
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.idea/
+.vscode/

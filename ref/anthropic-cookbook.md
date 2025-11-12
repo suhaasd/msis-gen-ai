@@ -13,4 +13,4 @@ Large language models have finite context windows (200k tokens for Claude 4). Wh
 Context limits: Long conversations or complex tasks can exceed available context
 Computational cost: Processing large contexts is expensive - attention mechanisms scale quadratically
 Repeated patterns: Similar tasks across conversations require re-explaining context every time
-Information loss: When context fills up, earlier important information gets lost
+Information loss: When context fills up, earlier important information gets lost.
